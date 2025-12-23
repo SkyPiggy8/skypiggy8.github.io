@@ -147,6 +147,25 @@
             z-index: 5;
         }
 
+        #error-overlay {
+            position: fixed;
+            left: 12px;
+            bottom: 12px;
+            right: 12px;
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.75);
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            color: #fceea7;
+            padding: 10px 12px;
+            font-size: 12px;
+            line-height: 1.4;
+            max-height: 34vh;
+            overflow: auto;
+            display: none;
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
         #file-input { display: none; }
 
         /* Hand Cursor for Gestures */
@@ -190,6 +209,27 @@
     </script>
 </head>
 <body>
+
+    <div id="error-overlay"></div>
+    <script>
+        (function () {
+            const box = document.getElementById('error-overlay');
+            function show(msg) {
+                try {
+                    box.style.display = 'block';
+                    box.textContent += (box.textContent ? '\n\n' : '') + msg;
+                } catch (_) {}
+            }
+            window.addEventListener('error', (e) => {
+                const where = e.filename ? `\n${e.filename}:${e.lineno}:${e.colno}` : '';
+                show(`JS Error: ${e.message || e.type}${where}`);
+            });
+            window.addEventListener('unhandledrejection', (e) => {
+                const reason = (e && e.reason) ? (e.reason.stack || String(e.reason)) : 'unknown';
+                show(`Unhandled Promise: ${reason}`);
+            });
+        })();
+    </script>
 
     <div id="loader">
         <div class="spinner"></div>
@@ -270,7 +310,6 @@
         let photoMeshGroup = new THREE.Group();
         let giftGroup;
         let nailongSprite;
-        let loopySprite;
         let handLandmarker, video, webcamCanvas, webcamCtx;
         let caneTexture; 
 
@@ -293,7 +332,8 @@
             addCartoonCharacters();
             setupPostProcessing();
             setupEvents();
-            await initMediaPipe();
+            // 不阻塞主场景：摄像头/模型加载失败也能正常进入页面
+            initMediaPipe().catch((e) => console.warn('MediaPipe init failed:', e));
             
             const loader = document.getElementById('loader');
             loader.style.opacity = 0;
@@ -615,13 +655,35 @@
             // 轻量“自动抠图”：取四角平均作为背景色，接近背景色的像素设为透明
             function autoCutoutTexture(img) {
                 const canvas = document.createElement('canvas');
-                const w = img.naturalWidth || img.width;
-                const h = img.naturalHeight || img.height;
+                const srcW = img.naturalWidth || img.width;
+                const srcH = img.naturalHeight || img.height;
+
+                // 下采样，避免大图逐像素处理导致页面卡死
+                const maxDim = 512;
+                const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+                const w = Math.max(1, Math.round(srcW * scale));
+                const h = Math.max(1, Math.round(srcH * scale));
                 canvas.width = w;
                 canvas.height = h;
+
                 const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                ctx.drawImage(img, 0, 0);
+                ctx.drawImage(img, 0, 0, w, h);
                 const data = ctx.getImageData(0, 0, w, h);
+
+                // 如果图片本身已有透明通道（常见的抠好 PNG），就不再做背景抠图
+                let hasAlpha = false;
+                for (let y = 0; y < h; y += Math.max(1, Math.floor(h / 10))) {
+                    for (let x = 0; x < w; x += Math.max(1, Math.floor(w / 10))) {
+                        const i = (y * w + x) * 4;
+                        if (data.data[i + 3] < 250) { hasAlpha = true; break; }
+                    }
+                    if (hasAlpha) break;
+                }
+                if (hasAlpha) {
+                    const tex = new THREE.CanvasTexture(canvas);
+                    tex.colorSpace = THREE.SRGBColorSpace;
+                    return tex;
+                }
 
                 function getPixel(x, y) {
                     const i = (y * w + x) * 4;
@@ -675,12 +737,6 @@
                 nailongSprite = sp;
                 nailongSprite.position.set(-4.2, -CONFIG.particles.treeHeight / 2 - 0.4, 10.5);
                 mainGroup.add(nailongSprite);
-            });
-
-            loadSprite(LOOPY_IMG, 4.6, 4.6, (sp) => {
-                loopySprite = sp;
-                loopySprite.position.set(3.9, -CONFIG.particles.treeHeight / 2 - 0.55, 10.2);
-                mainGroup.add(loopySprite);
             });
         }
 
@@ -928,7 +984,6 @@
             const showBaseDecor = (STATE.mode !== 'SCATTER');
             if (giftGroup) giftGroup.visible = showBaseDecor;
             if (nailongSprite) nailongSprite.visible = showBaseDecor;
-            if (loopySprite) loopySprite.visible = showBaseDecor;
 
             particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget));
             composer.render();
