@@ -21,7 +21,7 @@
             z-index: 10; pointer-events: none;
             display: flex; flex-direction: column; 
             align-items: center;
-            padding-top: 40px;
+            padding-top: 70px;
             box-sizing: border-box;
         }
         
@@ -69,6 +69,14 @@
             text-align: center;
             transition: opacity 0.5s ease;
         }
+
+        .button-row {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+        }
         .upload-btn {
             background: rgba(20, 20, 20, 0.6); 
             border: 1px solid rgba(212, 175, 55, 0.4); 
@@ -96,6 +104,47 @@
             margin-top: 10px;
             letter-spacing: 1px;
             text-transform: uppercase;
+        }
+
+        .audio-player {
+            margin-top: 18px;
+            pointer-events: auto;
+            text-align: center;
+        }
+        .audio-btn {
+            background: rgba(20, 20, 20, 0.6);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            color: #d4af37;
+            padding: 10px 22px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 11px;
+            transition: all 0.3s;
+            display: inline-block;
+            backdrop-filter: blur(5px);
+            margin: 0 8px;
+            border-radius: 4px;
+        }
+        .audio-btn:hover, .audio-btn:active {
+            background: #d4af37;
+            color: #000;
+            box-shadow: 0 0 12px rgba(212, 175, 55, 0.45);
+        }
+        .audio-player audio {
+            width: 260px;
+            max-width: 80vw;
+            margin-top: 8px;
+            filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.25));
+        }
+
+        #fx-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 5;
         }
 
         #file-input { display: none; }
@@ -156,12 +205,15 @@
         <div id="hand-cursor"></div>
 
         <div class="upload-wrapper">
-            <label class="upload-btn">
-                Add Memories
-                <input type="file" id="file-input" multiple accept="image/*">
-            </label>
-            <!-- 修改文案: Click -> Tap -->
-            <div class="hint-text">Tap or Pinch photos to select • Press 'H' to Hide Controls</div>
+            <div class="button-row">
+                <label class="upload-btn">
+                    添加回忆
+                    <input type="file" id="file-input" multiple accept="image/*">
+                </label>
+                <button class="audio-btn" id="audio-toggle">暂停音乐</button>
+            </div>
+            <div class="hint-text">对着摄像头握拳是合并圣诞树，张开手滑动看你上传的照片 · 按 H 隐藏/显示控件 · 音乐默认播放</div>
+            <audio id="bgm" preload="auto" loop src="audio/BingBing.mp3"></audio>
         </div>
     </div>
 
@@ -190,15 +242,18 @@
                 accentRed: 0x990000,     
             },
             particles: {
-                count: 1500,     
+                count: 1700,     
                 dustCount: 2500, 
                 treeHeight: 24,  
-                treeRadius: 8    
+                treeRadius: 7.2  
             },
             camera: {
                 z: 50 
             }
         };
+
+        const NAILONG_IMG = 'images/nailong3.png';
+ 
 
         const STATE = {
             mode: 'TREE', 
@@ -213,8 +268,14 @@
         let clock = new THREE.Clock();
         let particleSystem = []; 
         let photoMeshGroup = new THREE.Group();
+        let giftGroup;
+        let nailongSprite;
+        let loopySprite;
         let handLandmarker, video, webcamCanvas, webcamCtx;
         let caneTexture; 
+
+        // Fireworks overlay
+        let fxCanvas, fxCtx, fireworks = [], fireworksRAF = null, fireworksEnd = null;
         
         // Interaction variables
         const raycaster = new THREE.Raycaster();
@@ -228,6 +289,8 @@
             createParticles(); 
             createDust();     
             createDefaultPhotos();
+            createGifts();
+            addCartoonCharacters();
             setupPostProcessing();
             setupEvents();
             await initMediaPipe();
@@ -258,6 +321,7 @@
             container.appendChild(renderer.domElement);
 
             mainGroup = new THREE.Group();
+            mainGroup.position.y = -2; 
             scene.add(mainGroup);
         }
 
@@ -445,16 +509,16 @@
                 const rand = Math.random();
                 let mesh, type;
                 
-                if (rand < 0.40) {
+                if (rand < 0.25) {
                     mesh = new THREE.Mesh(boxGeo, greenMat);
                     type = 'BOX';
-                } else if (rand < 0.70) {
+                } else if (rand < 0.50) {
                     mesh = new THREE.Mesh(boxGeo, goldMat);
                     type = 'GOLD_BOX';
-                } else if (rand < 0.92) {
+                } else if (rand < 0.88) {
                     mesh = new THREE.Mesh(sphereGeo, goldMat);
                     type = 'GOLD_SPHERE';
-                } else if (rand < 0.97) {
+                } else if (rand < 0.96) {
                     mesh = new THREE.Mesh(sphereGeo, redMat);
                     type = 'RED';
                 } else {
@@ -462,7 +526,7 @@
                     type = 'CANE';
                 }
 
-                const s = 0.4 + Math.random() * 0.5;
+                const s = 0.28 + Math.random() * 0.32;
                 mesh.scale.set(s,s,s);
                 mesh.rotation.set(Math.random()*6, Math.random()*6, Math.random()*6);
                 
@@ -470,13 +534,13 @@
                 particleSystem.push(new Particle(mesh, type, false));
             }
 
-            const starGeo = new THREE.OctahedronGeometry(1.2, 0);
+            const starGeo = new THREE.OctahedronGeometry(0.9, 0);
             const starMat = new THREE.MeshStandardMaterial({
                 color: 0xffdd88, emissive: 0xffaa00, emissiveIntensity: 1.0,
                 metalness: 1.0, roughness: 0
             });
             const star = new THREE.Mesh(starGeo, starMat);
-            star.position.set(0, CONFIG.particles.treeHeight/2 + 1.2, 0);
+            star.position.set(0, CONFIG.particles.treeHeight/2 + 0.8, 0);
             mainGroup.add(star);
             
             mainGroup.add(photoMeshGroup);
@@ -510,6 +574,116 @@
             addPhotoToScene(tex);
         }
 
+        function createGifts() {
+            giftGroup = new THREE.Group();
+            const baseY = -CONFIG.particles.treeHeight / 2 - 1.6;
+            const palette = [CONFIG.colors.champagneGold, CONFIG.colors.accentRed, CONFIG.colors.deepGreen];
+
+            for (let i = 0; i < 55; i++) {
+                const size = 0.9 + Math.random() * 0.8;
+                const height = size * (0.65 + Math.random() * 0.35);
+                const boxGeo = new THREE.BoxGeometry(size, height, size);
+                const color = palette[Math.floor(Math.random() * palette.length)];
+                const boxMat = new THREE.MeshStandardMaterial({
+                    color,
+                    metalness: color === CONFIG.colors.champagneGold ? 0.95 : 0.45,
+                    roughness: color === CONFIG.colors.champagneGold ? 0.15 : 0.35,
+                    emissive: 0x111111,
+                    emissiveIntensity: 0.12
+                });
+                const gift = new THREE.Mesh(boxGeo, boxMat);
+
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 1.0 + Math.random() * 3.8;
+                gift.position.set(Math.cos(angle) * radius, baseY + height / 2, Math.sin(angle) * radius);
+                gift.rotation.y = Math.random() * Math.PI;
+
+                const ribbonGeo = new THREE.BoxGeometry(size * 0.14, height * 1.08, size * 1.06);
+                const ribbonGeo2 = new THREE.BoxGeometry(size * 1.06, height * 1.08, size * 0.14);
+                const ribbonMat = new THREE.MeshStandardMaterial({ color: 0xf7d35a, metalness: 1, roughness: 0.08, emissive: 0x553300, emissiveIntensity: 0.5 });
+                const ribbon1 = new THREE.Mesh(ribbonGeo, ribbonMat);
+                const ribbon2 = new THREE.Mesh(ribbonGeo2, ribbonMat);
+                gift.add(ribbon1); gift.add(ribbon2);
+
+                giftGroup.add(gift);
+            }
+
+            mainGroup.add(giftGroup);
+        }
+
+        function addCartoonCharacters() {
+            // 轻量“自动抠图”：取四角平均作为背景色，接近背景色的像素设为透明
+            function autoCutoutTexture(img) {
+                const canvas = document.createElement('canvas');
+                const w = img.naturalWidth || img.width;
+                const h = img.naturalHeight || img.height;
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0);
+                const data = ctx.getImageData(0, 0, w, h);
+
+                function getPixel(x, y) {
+                    const i = (y * w + x) * 4;
+                    return [data.data[i], data.data[i + 1], data.data[i + 2]];
+                }
+
+                const c1 = getPixel(2, 2);
+                const c2 = getPixel(w - 3, 2);
+                const c3 = getPixel(2, h - 3);
+                const c4 = getPixel(w - 3, h - 3);
+                const bg = [
+                    Math.round((c1[0] + c2[0] + c3[0] + c4[0]) / 4),
+                    Math.round((c1[1] + c2[1] + c3[1] + c4[1]) / 4),
+                    Math.round((c1[2] + c2[2] + c3[2] + c4[2]) / 4)
+                ];
+
+                const threshold = 42; // 越大抠得越“狠”
+                for (let i = 0; i < data.data.length; i += 4) {
+                    const r = data.data[i];
+                    const g = data.data[i + 1];
+                    const b = data.data[i + 2];
+                    const dr = r - bg[0];
+                    const dg = g - bg[1];
+                    const db = b - bg[2];
+                    const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+                    if (dist < threshold) data.data[i + 3] = 0;
+                }
+                ctx.putImageData(data, 0, 0);
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.colorSpace = THREE.SRGBColorSpace;
+                return tex;
+            }
+
+            function loadSprite(url, width, height, onReady) {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const tex = autoCutoutTexture(img);
+                    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
+                    const sprite = new THREE.Sprite(mat);
+                    sprite.scale.set(width, height, 1);
+                    sprite.renderOrder = 999;
+                    onReady(sprite);
+                };
+                img.onerror = () => console.warn('Character image not found:', url);
+                img.src = url;
+            }
+
+            // 放在树底礼物旁边（更靠前，避免被树遮住）
+            loadSprite(NAILONG_IMG, 5.2, 5.2, (sp) => {
+                nailongSprite = sp;
+                nailongSprite.position.set(-4.2, -CONFIG.particles.treeHeight / 2 - 0.4, 10.5);
+                mainGroup.add(nailongSprite);
+            });
+
+            loadSprite(LOOPY_IMG, 4.6, 4.6, (sp) => {
+                loopySprite = sp;
+                loopySprite.position.set(3.9, -CONFIG.particles.treeHeight / 2 - 0.55, 10.2);
+                mainGroup.add(loopySprite);
+            });
+        }
+
         function addPhotoToScene(texture) {
             const frameGeo = new THREE.BoxGeometry(1.4, 1.4, 0.05);
             const frameMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.champagneGold, metalness: 1.0, roughness: 0.1 });
@@ -524,7 +698,7 @@
             group.add(frame);
             group.add(photo);
             
-            const s = 0.8;
+            const s = 1.6;
             group.scale.set(s,s,s);
             
             photoMeshGroup.add(group);
@@ -751,11 +925,118 @@
             mainGroup.rotation.y = STATE.rotation.y;
             mainGroup.rotation.x = STATE.rotation.x;
 
+            const showBaseDecor = (STATE.mode !== 'SCATTER');
+            if (giftGroup) giftGroup.visible = showBaseDecor;
+            if (nailongSprite) nailongSprite.visible = showBaseDecor;
+            if (loopySprite) loopySprite.visible = showBaseDecor;
+
             particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget));
             composer.render();
         }
 
+        // Music control
+        const bgm = document.getElementById('bgm');
+        const audioToggle = document.getElementById('audio-toggle');
+        async function setPlaying(play) {
+            if (!bgm) return;
+            if (play) {
+                try {
+                    await bgm.play();
+                    if (audioToggle) audioToggle.textContent = '暂停音乐';
+                } catch (err) {
+                    console.error('Audio play failed', err);
+                    if (audioToggle) audioToggle.textContent = '播放音乐';
+                }
+            } else {
+                bgm.pause();
+                if (audioToggle) audioToggle.textContent = '播放音乐';
+            }
+        }
+
+        if (bgm && audioToggle) {
+            bgm.volume = 0.7;
+            // 默认尝试播放
+            setPlaying(true);
+            audioToggle.addEventListener('click', () => {
+                setPlaying(bgm.paused);
+            });
+        }
+
         init();
+    </script>
+
+    <canvas id="fx-canvas"></canvas>
+
+    <script>
+        // 礼花效果：开场自动播放，颗粒更大更满屏
+        const fxCanvasEl = document.getElementById('fx-canvas');
+        let fxWidth = window.innerWidth, fxHeight = window.innerHeight;
+        fxCanvasEl.width = fxWidth; fxCanvasEl.height = fxHeight;
+        const fx2d = fxCanvasEl.getContext('2d');
+        let fxBursts = []; let fxRAF; let fxEndAt = performance.now() + 5200;
+
+        function spawnBurst() {
+            const colors = ['#ffd35a', '#ff9b4a', '#ff6fb7', '#7cf2ff', '#7ef7c1', '#fff6d9'];
+            const x = Math.random() * fxWidth * 0.9 + fxWidth * 0.05;
+            const y = Math.random() * fxHeight * 0.45 + fxHeight * 0.03;
+            const count = 60 + Math.floor(Math.random() * 40);
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 5 + Math.random() * 6.5;
+                fxBursts.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 80 + Math.random() * 60,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    size: 3 + Math.random() * 3
+                });
+            }
+        }
+
+        let lastSpawn = 0;
+        function fxStep(ts) {
+            if (ts - lastSpawn > 220 && ts < fxEndAt) {
+                spawnBurst();
+                lastSpawn = ts;
+            }
+
+            fx2d.clearRect(0, 0, fxWidth, fxHeight);
+            fx2d.globalCompositeOperation = 'lighter';
+            for (let i = fxBursts.length - 1; i >= 0; i--) {
+                const p = fxBursts[i];
+                p.x += p.vx; p.y += p.vy;
+                p.vy += 0.05; // gravity
+                p.vx *= 0.99; p.vy *= 0.99;
+                p.life -= 1;
+                if (p.life <= 0) { fxBursts.splice(i,1); continue; }
+                const alpha = Math.max(0, Math.min(1, p.life / 60));
+                fx2d.fillStyle = p.color;
+                fx2d.globalAlpha = alpha;
+                fx2d.beginPath();
+                fx2d.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                fx2d.fill();
+            }
+
+            if (ts > fxEndAt && fxBursts.length === 0) {
+                cancelAnimationFrame(fxRAF);
+                fxCanvasEl.style.opacity = '0';
+                setTimeout(() => fxCanvasEl.remove(), 600);
+                return;
+            }
+            fxRAF = requestAnimationFrame(fxStep);
+        }
+
+        function startFireworks() {
+            fxStep(performance.now());
+        }
+
+        window.addEventListener('resize', () => {
+            fxWidth = window.innerWidth; fxHeight = window.innerHeight;
+            fxCanvasEl.width = fxWidth; fxCanvasEl.height = fxHeight;
+        });
+
+        startFireworks();
     </script>
 </body>
 </html>
