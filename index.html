@@ -147,25 +147,6 @@
             z-index: 5;
         }
 
-        #error-overlay {
-            position: fixed;
-            left: 12px;
-            bottom: 12px;
-            right: 12px;
-            z-index: 10000;
-            background: rgba(0, 0, 0, 0.75);
-            border: 1px solid rgba(212, 175, 55, 0.35);
-            color: #fceea7;
-            padding: 10px 12px;
-            font-size: 12px;
-            line-height: 1.4;
-            max-height: 34vh;
-            overflow: auto;
-            display: none;
-            white-space: pre-wrap;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        }
-
         #file-input { display: none; }
 
         /* Hand Cursor for Gestures */
@@ -209,27 +190,6 @@
     </script>
 </head>
 <body>
-
-    <div id="error-overlay"></div>
-    <script>
-        (function () {
-            const box = document.getElementById('error-overlay');
-            function show(msg) {
-                try {
-                    box.style.display = 'block';
-                    box.textContent += (box.textContent ? '\n\n' : '') + msg;
-                } catch (_) {}
-            }
-            window.addEventListener('error', (e) => {
-                const where = e.filename ? `\n${e.filename}:${e.lineno}:${e.colno}` : '';
-                show(`JS Error: ${e.message || e.type}${where}`);
-            });
-            window.addEventListener('unhandledrejection', (e) => {
-                const reason = (e && e.reason) ? (e.reason.stack || String(e.reason)) : 'unknown';
-                show(`Unhandled Promise: ${reason}`);
-            });
-        })();
-    </script>
 
     <div id="loader">
         <div class="spinner"></div>
@@ -294,18 +254,6 @@
 
         const NAILONG_IMG = 'images/nailong6.png';
 
-        // 你的“默认回忆照片”放这里（相对项目根目录）。
-        // 例：把照片放到 images/memories/ 下，然后在这里列出文件名。
-        const DEFAULT_MEMORY_PHOTOS = [
-            // 推荐：把图片路径写到 images/memories/manifest.json（数组），就不用每次改这里。
-            // 这里作为 manifest 缺失时的兜底。
-            'images/memories/5362263002163166a2f49a5ddfdf76dd.jpg',
-            'images/memories/9c535ee1ce4288c53737c8bea788a11b.jpg',
-            'images/memories/f65c9d64bf0e9265682dcbfb0dfd16a2.jpg',
-            'images/memories/ff50040e1c415696307969dfc863b00e.jpg',
-        ];
- 
-
         const STATE = {
             mode: 'TREE', 
             focusIndex: -1, 
@@ -338,7 +286,6 @@
             createTextures();
             createParticles(); 
             createDust();     
-            createDefaultPhotos();
             createGifts();
             addCartoonCharacters();
             setupPostProcessing();
@@ -365,8 +312,8 @@
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            // 限制像素比以提升移动端性能
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            // 提高清晰度（仍保留上限，避免移动端过重）
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
             renderer.toneMapping = THREE.ReinhardToneMapping; 
             renderer.toneMappingExposure = 2.2; 
             container.appendChild(renderer.domElement);
@@ -517,7 +464,8 @@
                 } else if (mode === 'SCATTER' && this.type === 'PHOTO') {
                     s = this.baseScale * 2.5; 
                 } else if (mode === 'FOCUS') {
-                    if (this.mesh === focusTargetMesh) s = 4.5; 
+                    // 聚焦时更大更清晰
+                    if (this.mesh === focusTargetMesh) s = 6.5; 
                     else s = this.baseScale * 0.8; 
                 }
                 
@@ -609,111 +557,6 @@
                  mainGroup.add(mesh);
                  particleSystem.push(new Particle(mesh, 'DUST', true));
             }
-        }
-
-        function createDefaultPhotos() {
-            // 默认照片加载策略：
-            // 1) 优先读取 images/memories/manifest.json（数组：图片路径）
-            // 2) manifest 不存在时，回退到 DEFAULT_MEMORY_PHOTOS
-            let urls = [];
-            let loadedAny = false;
-            let attemptDone = false;
-
-            const loader = new THREE.TextureLoader();
-            const loadUrls = (list) => {
-                const listUrls = (Array.isArray(list) ? list : []).filter(Boolean);
-                if (listUrls.length === 0) return;
-                const expected = listUrls.length;
-                let loaded = 0;
-                const failed = [];
-                let lastStatusText = '';
-
-                const showStatusIfNeeded = () => {
-                    // 成功加载部分也要提示“还有哪些失败/还在加载”
-                    if (loaded + failed.length >= expected && failed.length === 0) return;
-                    const overlay = document.getElementById('error-overlay');
-                    if (!overlay) return;
-                    overlay.style.display = 'block';
-                    const statusText = [
-                        `默认回忆照片：已加载 ${loaded}/${expected} 张（失败 ${failed.length} 张）。`,
-                        `当前场景照片对象：${photoMeshGroup?.children?.length ?? 0} 个。`,
-                        failed.length ? `加载失败：\n- ${failed.join('\n- ')}` : '仍在加载中…（网络/图片体积大时会慢一点）'
-                    ].join('\n\n');
-                    if (statusText === lastStatusText) return;
-                    lastStatusText = statusText;
-                    overlay.textContent = statusText;
-                };
-
-                listUrls.forEach((url) => {
-                    loader.load(
-                        url,
-                        (t) => {
-                            loadedAny = true;
-                            loaded += 1;
-                            t.colorSpace = THREE.SRGBColorSpace;
-                            addPhotoToScene(t);
-                            // 成功加载后也更新一次状态（如果之前有失败）
-                            if (failed.length) setTimeout(showStatusIfNeeded, 200);
-                        },
-                        undefined,
-                        (err) => {
-                            failed.push(url);
-                            console.warn('Default photo load failed:', url, err);
-                            // 等一等再提示，避免网络慢时误报
-                            setTimeout(showStatusIfNeeded, 1200);
-                        }
-                    );
-                });
-
-                // 如果 2 秒后仍没全加载，提示一次状态
-                setTimeout(showStatusIfNeeded, 2000);
-                // 如果 6 秒后仍没全到位，再提示一次（覆盖更慢的加载）
-                setTimeout(showStatusIfNeeded, 6000);
-            };
-
-            fetch('images/memories/manifest.json', { cache: 'no-store' })
-                .then((r) => {
-                    if (!r.ok) throw new Error(String(r.status));
-                    return r.json();
-                })
-                .then((list) => {
-                    urls = (Array.isArray(list) ? list : []).filter(Boolean);
-                    if (urls.length > 0) {
-                        loadUrls(urls);
-                        return;
-                    }
-                    urls = (Array.isArray(DEFAULT_MEMORY_PHOTOS) ? DEFAULT_MEMORY_PHOTOS : []).filter(Boolean);
-                    loadUrls(urls);
-                })
-                .catch(() => {
-                    urls = (Array.isArray(DEFAULT_MEMORY_PHOTOS) ? DEFAULT_MEMORY_PHOTOS : []).filter(Boolean);
-                    loadUrls(urls);
-                })
-                .finally(() => {
-                    attemptDone = true;
-                });
-
-            // 如果没有配置默认照片/都加载失败，就放一个占位图
-            const maybeAddPlaceholder = () => {
-                if (loadedAny) return;
-                if (!attemptDone) {
-                    setTimeout(maybeAddPlaceholder, 600);
-                    return;
-                }
-                const canvas = document.createElement('canvas');
-                canvas.width = 512; canvas.height = 512;
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = '#050505'; ctx.fillRect(0,0,512,512);
-                ctx.strokeStyle = '#eebb66'; ctx.lineWidth = 15; ctx.strokeRect(20,20,472,472);
-                ctx.font = '500 60px Times New Roman'; ctx.fillStyle = '#eebb66';
-                ctx.textAlign = 'center';
-                ctx.fillText("JOYEUX", 256, 230);
-                ctx.fillText("NOEL", 256, 300);
-                const tex = new THREE.CanvasTexture(canvas);
-                tex.colorSpace = THREE.SRGBColorSpace;
-                addPhotoToScene(tex);
-            };
-            setTimeout(maybeAddPlaceholder, 1600);
         }
 
         function createGifts() {
@@ -872,6 +715,15 @@
                 reader.onload = (ev) => {
                     new THREE.TextureLoader().load(ev.target.result, (t) => {
                         t.colorSpace = THREE.SRGBColorSpace;
+                        // 提升清晰度（对倾斜纹理/远处纹理更有效）
+                        if (renderer) {
+                            const maxA = renderer.capabilities.getMaxAnisotropy?.() ?? 1;
+                            t.anisotropy = Math.max(1, maxA);
+                        }
+                        // 避免某些情况下采样模糊
+                        t.wrapS = THREE.ClampToEdgeWrapping;
+                        t.wrapT = THREE.ClampToEdgeWrapping;
+                        t.needsUpdate = true;
                         addPhotoToScene(t);
                     });
                 }
