@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <!-- 修改: 禁止缩放，适应移动端全屏体验 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Grand Luxury Tree Mobile (Gesture Select)</title>
+    <title>Peyton 圣诞快乐！</title>
     <style>
         /* 修改: 禁用默认触摸动作，防止页面滚动 */
         body { 
@@ -293,6 +293,17 @@
         };
 
         const NAILONG_IMG = 'images/nailong3.png';
+
+        // 你的“默认回忆照片”放这里（相对项目根目录）。
+        // 例：把照片放到 images/memories/ 下，然后在这里列出文件名。
+        const DEFAULT_MEMORY_PHOTOS = [
+            // 推荐：把图片路径写到 images/memories/manifest.json（数组），就不用每次改这里。
+            // 这里作为 manifest 缺失时的兜底。
+            'images/memories/5362263002163166a2f49a5ddfdf76dd.jpg',
+            'images/memories/9c535ee1ce4288c53737c8bea788a11b.jpg',
+            'images/memories/f65c9d64bf0e9265682dcbfb0dfd16a2.jpg',
+            'images/memories/ff50040e1c415696307969dfc863b00e.jpg',
+        ];
  
 
         const STATE = {
@@ -453,7 +464,9 @@
                 let rMax = CONFIG.particles.treeRadius * (1.0 - t); 
                 if (rMax < 0.5) rMax = 0.5;
                 const angle = t * 50 * Math.PI + Math.random() * Math.PI; 
-                const r = rMax * (0.8 + Math.random() * 0.4); 
+                // 让照片更靠外，减少被树体/装饰遮挡
+                const outward = (this.type === 'PHOTO') ? 1.25 : 1.0;
+                const r = rMax * (0.8 + Math.random() * 0.4) * outward; 
                 this.posTree.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
 
                 let rScatter = this.isDust ? (12 + Math.random()*20) : (8 + Math.random()*12);
@@ -599,19 +612,108 @@
         }
 
         function createDefaultPhotos() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#050505'; ctx.fillRect(0,0,512,512);
-            ctx.strokeStyle = '#eebb66'; ctx.lineWidth = 15; ctx.strokeRect(20,20,472,472);
-            ctx.font = '500 60px Times New Roman'; ctx.fillStyle = '#eebb66';
-            ctx.textAlign = 'center'; 
-            ctx.fillText("JOYEUX", 256, 230);
-            ctx.fillText("NOEL", 256, 300);
-            
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.colorSpace = THREE.SRGBColorSpace;
-            addPhotoToScene(tex);
+            // 默认照片加载策略：
+            // 1) 优先读取 images/memories/manifest.json（数组：图片路径）
+            // 2) manifest 不存在时，回退到 DEFAULT_MEMORY_PHOTOS
+            let urls = [];
+            let loadedAny = false;
+            let attemptDone = false;
+
+            const loader = new THREE.TextureLoader();
+            const loadUrls = (list) => {
+                const listUrls = (Array.isArray(list) ? list : []).filter(Boolean);
+                if (listUrls.length === 0) return;
+                const expected = listUrls.length;
+                let loaded = 0;
+                const failed = [];
+                let lastStatusText = '';
+
+                const showStatusIfNeeded = () => {
+                    // 成功加载部分也要提示“还有哪些失败/还在加载”
+                    if (loaded + failed.length >= expected && failed.length === 0) return;
+                    const overlay = document.getElementById('error-overlay');
+                    if (!overlay) return;
+                    overlay.style.display = 'block';
+                    const statusText = [
+                        `默认回忆照片：已加载 ${loaded}/${expected} 张（失败 ${failed.length} 张）。`,
+                        `当前场景照片对象：${photoMeshGroup?.children?.length ?? 0} 个。`,
+                        failed.length ? `加载失败：\n- ${failed.join('\n- ')}` : '仍在加载中…（网络/图片体积大时会慢一点）'
+                    ].join('\n\n');
+                    if (statusText === lastStatusText) return;
+                    lastStatusText = statusText;
+                    overlay.textContent = statusText;
+                };
+
+                listUrls.forEach((url) => {
+                    loader.load(
+                        url,
+                        (t) => {
+                            loadedAny = true;
+                            loaded += 1;
+                            t.colorSpace = THREE.SRGBColorSpace;
+                            addPhotoToScene(t);
+                            // 成功加载后也更新一次状态（如果之前有失败）
+                            if (failed.length) setTimeout(showStatusIfNeeded, 200);
+                        },
+                        undefined,
+                        (err) => {
+                            failed.push(url);
+                            console.warn('Default photo load failed:', url, err);
+                            // 等一等再提示，避免网络慢时误报
+                            setTimeout(showStatusIfNeeded, 1200);
+                        }
+                    );
+                });
+
+                // 如果 2 秒后仍没全加载，提示一次状态
+                setTimeout(showStatusIfNeeded, 2000);
+                // 如果 6 秒后仍没全到位，再提示一次（覆盖更慢的加载）
+                setTimeout(showStatusIfNeeded, 6000);
+            };
+
+            fetch('images/memories/manifest.json', { cache: 'no-store' })
+                .then((r) => {
+                    if (!r.ok) throw new Error(String(r.status));
+                    return r.json();
+                })
+                .then((list) => {
+                    urls = (Array.isArray(list) ? list : []).filter(Boolean);
+                    if (urls.length > 0) {
+                        loadUrls(urls);
+                        return;
+                    }
+                    urls = (Array.isArray(DEFAULT_MEMORY_PHOTOS) ? DEFAULT_MEMORY_PHOTOS : []).filter(Boolean);
+                    loadUrls(urls);
+                })
+                .catch(() => {
+                    urls = (Array.isArray(DEFAULT_MEMORY_PHOTOS) ? DEFAULT_MEMORY_PHOTOS : []).filter(Boolean);
+                    loadUrls(urls);
+                })
+                .finally(() => {
+                    attemptDone = true;
+                });
+
+            // 如果没有配置默认照片/都加载失败，就放一个占位图
+            const maybeAddPlaceholder = () => {
+                if (loadedAny) return;
+                if (!attemptDone) {
+                    setTimeout(maybeAddPlaceholder, 600);
+                    return;
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = 512; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#050505'; ctx.fillRect(0,0,512,512);
+                ctx.strokeStyle = '#eebb66'; ctx.lineWidth = 15; ctx.strokeRect(20,20,472,472);
+                ctx.font = '500 60px Times New Roman'; ctx.fillStyle = '#eebb66';
+                ctx.textAlign = 'center';
+                ctx.fillText("JOYEUX", 256, 230);
+                ctx.fillText("NOEL", 256, 300);
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.colorSpace = THREE.SRGBColorSpace;
+                addPhotoToScene(tex);
+            };
+            setTimeout(maybeAddPlaceholder, 1600);
         }
 
         function createGifts() {
@@ -732,10 +834,10 @@
                 img.src = url;
             }
 
-            // 放在树底礼物旁边（更靠前，避免被树遮住）
-            loadSprite(NAILONG_IMG, 5.2, 5.2, (sp) => {
+            // 放在圣诞树顶部
+            loadSprite(NAILONG_IMG, 3.2, 3.2, (sp) => {
                 nailongSprite = sp;
-                nailongSprite.position.set(-4.2, -CONFIG.particles.treeHeight / 2 - 0.4, 10.5);
+                nailongSprite.position.set(0.0, CONFIG.particles.treeHeight / 2 + 0.6, 0.6);
                 mainGroup.add(nailongSprite);
             });
         }
@@ -754,7 +856,7 @@
             group.add(frame);
             group.add(photo);
             
-            const s = 1.6;
+            const s = 1.15;
             group.scale.set(s,s,s);
             
             photoMeshGroup.add(group);
@@ -1015,6 +1117,12 @@
             audioToggle.addEventListener('click', () => {
                 setPlaying(bgm.paused);
             });
+
+            // 兼容浏览器自动播放限制：用户“点进页面”的第一次交互再强制播放
+            const tryAutoplayOnFirstTap = () => {
+                if (bgm.paused) setPlaying(true);
+            };
+            window.addEventListener('pointerdown', tryAutoplayOnFirstTap, { once: true, capture: true });
         }
 
         init();
