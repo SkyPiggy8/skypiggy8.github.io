@@ -1,1057 +1,1016 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <!-- 修改: 禁止缩放，适应移动端全屏体验 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Peyton 圣诞快乐！</title>
-    <style>
-        /* 修改: 禁用默认触摸动作，防止页面滚动 */
-        body { 
-            margin: 0; overflow: hidden; background-color: #000000; font-family: 'Times New Roman', serif; 
-            touch-action: none; 
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
-        
-        /* UI Overlay - Minimalist */
-        #ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; pointer-events: none;
-            display: flex; flex-direction: column; 
-            align-items: center;
-            padding-top: 70px;
-            box-sizing: border-box;
-        }
-        
-        .ui-hidden {
-            opacity: 0;
-            pointer-events: none !important;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="YasFood presents research and engineering work in embodied AI, kitchen robotics, and intelligent hardware systems.">
+  <title>YasFood | Embodied AI for Kitchen Systems</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,700&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f3efe6;
+      --paper: rgba(255, 252, 246, 0.78);
+      --paper-strong: rgba(255, 252, 246, 0.92);
+      --ink: #17211c;
+      --muted: #55625d;
+      --line: rgba(23, 33, 28, 0.12);
+      --accent: #a44d2d;
+      --accent-soft: rgba(164, 77, 45, 0.14);
+      --forest: #27453c;
+      --highlight: #e8dfcf;
+      --shadow: 0 24px 60px rgba(46, 53, 47, 0.12);
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --content-width: 1160px;
+    }
 
-        /* Loading */
-        #loader {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 100;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: opacity 0.8s ease-out;
-        }
-        .loader-text {
-            color: #d4af37; font-size: 14px; letter-spacing: 4px; margin-top: 20px;
-            text-transform: uppercase; font-weight: 100;
-        }
-        .spinner {
-            width: 40px; height: 40px; border: 1px solid rgba(212, 175, 55, 0.2); 
-            border-top: 1px solid #d4af37; border-radius: 50%; 
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    * {
+      box-sizing: border-box;
+    }
 
-        /* Typography */
-        h1 { 
-            color: #fceea7; font-size: 42px; /* 修改: 稍微调小手机端字体 */
-            margin: 0; font-weight: 400; 
-            letter-spacing: 4px; 
-            text-shadow: 0 0 50px rgba(252, 238, 167, 0.6); 
-            background: linear-gradient(to bottom, #fff, #eebb66);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            font-family: 'Cinzel', 'Times New Roman', serif;
-            opacity: 0.9;
-            transition: opacity 0.5s ease;
-            text-align: center;
-        }
+    html {
+      scroll-behavior: smooth;
+    }
 
-        /* Upload Button */
-        .upload-wrapper {
-            margin-top: 20px;
-            pointer-events: auto;
-            text-align: center;
-            transition: opacity 0.5s ease;
-        }
+    body {
+      margin: 0;
+      font-family: "Manrope", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(164, 77, 45, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(39, 69, 60, 0.14), transparent 34%),
+        linear-gradient(180deg, #efe9dd 0%, #f6f2ea 34%, #f3efe6 100%);
+      line-height: 1.65;
+    }
 
-        .button-row {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .upload-btn {
-            background: rgba(20, 20, 20, 0.6); 
-            border: 1px solid rgba(212, 175, 55, 0.4); 
-            color: #d4af37; 
-            padding: 12px 30px; /* 修改: 增大点击区域 */
-            cursor: pointer; 
-            text-transform: uppercase; 
-            letter-spacing: 3px; 
-            font-size: 12px; /* 修改: 增大字号 */
-            transition: all 0.4s;
-            display: inline-block;
-            backdrop-filter: blur(5px);
-            margin: 0 10px;
-            border-radius: 4px;
-        }
-        .upload-btn:hover, .upload-btn:active { 
-            background: #d4af37; 
-            color: #000; 
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
-        }
-        
-        .hint-text {
-            color: rgba(212, 175, 55, 0.5);
-            font-size: 10px;
-            margin-top: 10px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.35;
+      background-image:
+        linear-gradient(rgba(23, 33, 28, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 33, 28, 0.025) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.82), transparent 92%);
+    }
 
-        .audio-player {
-            margin-top: 18px;
-            pointer-events: auto;
-            text-align: center;
-        }
-        .audio-btn {
-            background: rgba(20, 20, 20, 0.6);
-            border: 1px solid rgba(212, 175, 55, 0.4);
-            color: #d4af37;
-            padding: 10px 22px;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-size: 11px;
-            transition: all 0.3s;
-            display: inline-block;
-            backdrop-filter: blur(5px);
-            margin: 0 8px;
-            border-radius: 4px;
-        }
-        .audio-btn:hover, .audio-btn:active {
-            background: #d4af37;
-            color: #000;
-            box-shadow: 0 0 12px rgba(212, 175, 55, 0.45);
-        }
-        .audio-player audio {
-            width: 260px;
-            max-width: 80vw;
-            margin-top: 8px;
-            filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.25));
-        }
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
 
-        #fx-canvas {
-            position: absolute;
-            inset: 0;
-            width: 100vw;
-            height: 100vh;
-            pointer-events: none;
-            z-index: 5;
-        }
+    img {
+      max-width: 100%;
+      display: block;
+    }
 
-        #file-input { display: none; }
+    .shell {
+      width: min(calc(100% - 32px), var(--content-width));
+      margin: 0 auto;
+    }
 
-        /* Hand Cursor for Gestures */
-        #hand-cursor {
-            position: absolute;
-            width: 30px; height: 30px;
-            border: 2px solid #d4af37;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 1000;
-            display: none;
-            box-shadow: 0 0 15px rgba(212, 175, 55, 0.8);
-            transition: transform 0.2s, border-color 0.2s;
-            background: rgba(255, 215, 0, 0.1);
-        }
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(14px);
+      background: rgba(243, 239, 230, 0.74);
+      border-bottom: 1px solid rgba(23, 33, 28, 0.08);
+    }
 
-        /* Webcam feedback */
-        #webcam-wrapper {
-            position: absolute; bottom: 20px; right: 20px;
-            width: 90px; height: 120px; /* 修改: 适应竖屏比例 */
-            border: 1px solid rgba(255,255,255,0.1);
-            overflow: hidden; opacity: 0; 
-            pointer-events: none;
-            border-radius: 8px;
-        }
-    </style>
-    
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
-    </style>
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      min-height: 74px;
+    }
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-                "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm"
-            }
-        }
-    </script>
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand-mark {
+      font-size: 0.75rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .brand-name {
+      font-family: "Newsreader", serif;
+      font-size: 1.45rem;
+      letter-spacing: 0.02em;
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 18px;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .nav a {
+      position: relative;
+      padding-bottom: 4px;
+    }
+
+    .nav a::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 1px;
+      background: var(--ink);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 180ms ease;
+    }
+
+    .nav a:hover::after,
+    .nav a:focus-visible::after {
+      transform: scaleX(1);
+    }
+
+    main {
+      padding: 28px 0 80px;
+    }
+
+    section {
+      scroll-margin-top: 96px;
+    }
+
+    .hero {
+      padding: 42px 0 28px;
+    }
+
+    .hero-panel {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(145deg, rgba(255, 252, 246, 0.92), rgba(244, 237, 224, 0.8));
+      border: 1px solid rgba(23, 33, 28, 0.08);
+      border-radius: 34px;
+      box-shadow: var(--shadow);
+      padding: 34px;
+    }
+
+    .hero-panel::after {
+      content: "";
+      position: absolute;
+      width: 360px;
+      height: 360px;
+      right: -100px;
+      top: -120px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(164, 77, 45, 0.18), transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.85fr);
+      gap: 28px;
+      align-items: stretch;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(39, 69, 60, 0.1);
+      color: var(--forest);
+      font-size: 0.82rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      font-family: "Newsreader", serif;
+      font-weight: 500;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+    }
+
+    h1 {
+      margin-top: 18px;
+      font-size: clamp(3rem, 6.6vw, 5.6rem);
+      max-width: 11ch;
+    }
+
+    .hero-copy {
+      margin-top: 22px;
+      max-width: 64ch;
+      font-size: 1.03rem;
+      color: var(--muted);
+    }
+
+    .hero-copy strong {
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 28px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 20px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-weight: 700;
+      transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+    }
+
+    .button:hover,
+    .button:focus-visible {
+      transform: translateY(-2px);
+    }
+
+    .button-primary {
+      background: var(--forest);
+      color: #f8f4ea;
+      box-shadow: 0 18px 40px rgba(39, 69, 60, 0.22);
+    }
+
+    .button-secondary {
+      background: rgba(255, 255, 255, 0.55);
+      border-color: rgba(23, 33, 28, 0.12);
+      color: var(--ink);
+    }
+
+    .hero-meta {
+      display: grid;
+      gap: 16px;
+      align-content: space-between;
+    }
+
+    .stat-card,
+    .feature-card,
+    .timeline-card,
+    .contact-card {
+      background: var(--paper);
+      border: 1px solid rgba(23, 33, 28, 0.08);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 16px 40px rgba(66, 71, 68, 0.08);
+    }
+
+    .stat-card {
+      padding: 24px;
+    }
+
+    .stat-label {
+      font-size: 0.74rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 800;
+    }
+
+    .stat-value {
+      margin-top: 12px;
+      font-family: "Newsreader", serif;
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      line-height: 1;
+    }
+
+    .stat-description {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .hero-list {
+      display: grid;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .hero-list li {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 12px;
+      align-items: start;
+      color: var(--muted);
+    }
+
+    .hero-list li::before {
+      content: "\2022";
+      color: var(--accent);
+      font-size: 1.2rem;
+      line-height: 1;
+      margin-top: 4px;
+    }
+
+    .section-heading {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 0.8fr);
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    .section-heading h2 {
+      font-size: clamp(2rem, 4vw, 3.1rem);
+    }
+
+    .section-heading p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .section-block {
+      margin-top: 28px;
+      padding: 12px 0 0;
+    }
+
+    .research-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .feature-card {
+      padding: 24px;
+      min-height: 240px;
+      display: grid;
+      align-content: start;
+      gap: 14px;
+    }
+
+    .feature-index {
+      width: fit-content;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .feature-card h3 {
+      font-size: 1.7rem;
+    }
+
+    .feature-card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: auto;
+    }
+
+    .tag {
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(23, 33, 28, 0.06);
+      color: var(--forest);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .project-card {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(255, 252, 246, 0.92), rgba(242, 236, 224, 0.82));
+      border: 1px solid rgba(23, 33, 28, 0.08);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 20px 42px rgba(70, 74, 70, 0.08);
+    }
+
+    .project-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(160deg, rgba(39, 69, 60, 0.08), transparent 42%, rgba(164, 77, 45, 0.08));
+      pointer-events: none;
+    }
+
+    .project-card > * {
+      position: relative;
+    }
+
+    .project-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 0.86rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    .status-pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(39, 69, 60, 0.12);
+      color: var(--forest);
+    }
+
+    .project-card h3 {
+      margin-top: 18px;
+      font-size: clamp(1.7rem, 2vw, 2.2rem);
+    }
+
+    .project-summary {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .metric-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .metric-chip {
+      padding: 9px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(23, 33, 28, 0.08);
+      font-size: 0.84rem;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .project-notes {
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(23, 33, 28, 0.08);
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .framework-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .framework-card,
+    .timeline-card,
+    .contact-card {
+      padding: 24px;
+    }
+
+    .framework-card {
+      background: linear-gradient(180deg, rgba(39, 69, 60, 0.96), rgba(29, 50, 44, 0.98));
+      color: #edf0e4;
+      border-radius: var(--radius-xl);
+      box-shadow: 0 24px 48px rgba(25, 44, 38, 0.24);
+    }
+
+    .framework-card p {
+      margin: 14px 0 0;
+      color: rgba(237, 240, 228, 0.82);
+    }
+
+    .framework-points {
+      display: grid;
+      gap: 14px;
+      margin-top: 22px;
+    }
+
+    .framework-point {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .framework-point strong {
+      display: block;
+      font-size: 1rem;
+      color: #fff6df;
+    }
+
+    .framework-point span {
+      display: block;
+      margin-top: 4px;
+      color: rgba(237, 240, 228, 0.8);
+      font-size: 0.94rem;
+    }
+
+    .timeline-card h3,
+    .contact-card h3 {
+      font-size: 1.8rem;
+    }
+
+    .timeline-list {
+      display: grid;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .timeline-item {
+      padding-left: 16px;
+      border-left: 2px solid rgba(164, 77, 45, 0.2);
+    }
+
+    .timeline-item strong {
+      display: block;
+      font-size: 0.93rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .timeline-item span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .contact-card {
+      min-height: 220px;
+      display: grid;
+      align-content: start;
+      gap: 12px;
+    }
+
+    .contact-label {
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 800;
+    }
+
+    .contact-value {
+      font-family: "Newsreader", serif;
+      font-size: 1.7rem;
+      line-height: 1.1;
+    }
+
+    .contact-card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 24px;
+      margin-top: 40px;
+      border-top: 1px solid rgba(23, 33, 28, 0.08);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity 700ms ease, transform 700ms ease;
+    }
+
+    .reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 980px) {
+      .hero-grid,
+      .section-heading,
+      .framework-grid,
+      .research-grid,
+      .project-grid,
+      .contact-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-heading {
+        align-items: start;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .header-inner {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 12px 0;
+      }
+
+      .hero-panel,
+      .feature-card,
+      .project-card,
+      .framework-card,
+      .timeline-card,
+      .contact-card {
+        padding: 20px;
+      }
+
+      h1 {
+        max-width: 100%;
+      }
+
+      .nav {
+        gap: 14px;
+        font-size: 0.9rem;
+      }
+
+      .hero-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .button {
+        width: 100%;
+      }
+
+      .footer {
+        flex-direction: column;
+      }
+    }
+  </style>
 </head>
 <body>
-
-    <div id="loader">
-        <div class="spinner"></div>
-        <div class="loader-text">Loading Holiday Magic</div>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <div class="brand">
+        <span class="brand-mark">YasFood Research</span>
+        <a class="brand-name" href="#top">Embodied AI for Kitchen Systems</a>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <a href="#research">Research</a>
+        <a href="#projects">Projects</a>
+        <a href="#framework">Framework</a>
+        <a href="#contact">Contact</a>
+      </nav>
     </div>
+  </header>
 
-    <div id="canvas-container"></div>
-
-    <div id="ui-layer">
-        <h1>Merry Christmas</h1>
-        
-        <!-- Hand Cursor Element -->
-        <div id="hand-cursor"></div>
-
-        <div class="upload-wrapper">
-            <div class="button-row">
-                <label class="upload-btn">
-                    添加回忆
-                    <input type="file" id="file-input" multiple accept="image/*">
-                </label>
-                <button class="audio-btn" id="audio-toggle">暂停音乐</button>
+  <main id="top" class="shell">
+    <section class="hero reveal">
+      <div class="hero-panel">
+        <div class="hero-grid">
+          <div>
+            <span class="eyebrow">Research-led builder</span>
+            <h1>Designing intelligent kitchen machines with embodied AI.</h1>
+            <p class="hero-copy">
+              <strong>YasFood</strong> is a personal research and engineering portfolio focused on the intersection of
+              robotics, multimodal intelligence, and connected kitchen hardware. The site is structured like an
+              academic homepage so future work can be documented as systems, experiments, and deployable products.
+            </p>
+            <p class="hero-copy">
+              Current directions include <strong>VLA robotic manipulation for beverage preparation</strong>,
+              <strong>AI-native device orchestration in kitchen environments</strong>, and practical hardware-software
+              pipelines that connect sensors, motion, perception, and user intent into one coherent workflow.
+            </p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#projects">View Featured Projects</a>
+              <a class="button button-secondary" href="https://www.yasfood.cn" target="_blank" rel="noreferrer">Visit yasfood.cn</a>
             </div>
-            <div class="hint-text">对着摄像头握拳是合并圣诞树，张开手滑动看你上传的照片 · 按 H 隐藏/显示控件 · 音乐默认播放</div>
-            <audio id="bgm" preload="auto" loop src="audio/BingBing.mp3"></audio>
+          </div>
+
+          <div class="hero-meta">
+            <article class="stat-card">
+              <div class="stat-label">Working Thesis</div>
+              <div class="stat-value">Kitchen automation should feel precise, assistive, and human-aware.</div>
+              <p class="stat-description">
+                The portfolio is framed around real-world embodied intelligence rather than demo-only interaction.
+              </p>
+            </article>
+
+            <article class="stat-card">
+              <div class="stat-label">Focus Areas</div>
+              <ul class="hero-list">
+                <li>Vision-language-action systems for repeatable kitchen tasks and small-batch food workflows.</li>
+                <li>Connected hardware stacks that let devices, sensors, and agents coordinate safely.</li>
+                <li>Product-oriented experimentation where prototypes can evolve into robust consumer systems.</li>
+              </ul>
+            </article>
+          </div>
         </div>
-    </div>
+      </div>
+    </section>
 
-    <!-- Webcam hidden structure -->
-    <div id="webcam-wrapper">
-        <!-- 修改: 增加 playsinline 确保iOS不全屏播放 -->
-        <video id="webcam" autoplay playsinline style="display:none;"></video>
-        <canvas id="webcam-preview"></canvas>
-    </div>
+    <section id="research" class="section-block reveal">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Research Directions</span>
+          <h2>From embodied perception to usable kitchen infrastructure</h2>
+        </div>
+        <p>
+          This homepage is ready for project case studies, publications, prototype videos, datasets, and deployment
+          notes. Each section is written to support a more research-oriented presentation style.
+        </p>
+      </div>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'; 
-        import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+      <div class="research-grid">
+        <article class="feature-card">
+          <div class="feature-index">01</div>
+          <h3>Embodied Cooking Intelligence</h3>
+          <p>
+            Building robotic systems that can perceive utensils, ingredients, and changing workspace states while
+            executing long-horizon kitchen actions.
+          </p>
+          <div class="tag-list">
+            <span class="tag">VLA</span>
+            <span class="tag">Manipulation</span>
+            <span class="tag">Scene Understanding</span>
+          </div>
+        </article>
 
-        // --- CONFIGURATION ---
-        const CONFIG = {
-            colors: {
-                bg: 0x000000, 
-                champagneGold: 0xffd966, 
-                deepGreen: 0x03180a,     
-                accentRed: 0x990000,     
-            },
-            particles: {
-                count: 1700,     
-                dustCount: 2500, 
-                treeHeight: 24,  
-                treeRadius: 7.2  
-            },
-            camera: {
-                z: 50 
-            }
-        };
+        <article class="feature-card">
+          <div class="feature-index">02</div>
+          <h3>Connected Device Systems</h3>
+          <p>
+            Designing hardware architectures that allow appliances, sensors, controllers, and cloud intelligence to
+            operate as one coordinated environment instead of isolated products.
+          </p>
+          <div class="tag-list">
+            <span class="tag">IoT</span>
+            <span class="tag">Edge Control</span>
+            <span class="tag">Safety Layers</span>
+          </div>
+        </article>
 
-        const NAILONG_IMG = 'images/nailong6.png';
+        <article class="feature-card">
+          <div class="feature-index">03</div>
+          <h3>Human-Centered Deployment</h3>
+          <p>
+            Translating experimental prototypes into reliable systems that can live in kitchens, cafés, and compact
+            food-service settings without losing clarity or maintainability.
+          </p>
+          <div class="tag-list">
+            <span class="tag">UX for Robotics</span>
+            <span class="tag">Workflow Design</span>
+            <span class="tag">Productization</span>
+          </div>
+        </article>
+      </div>
+    </section>
 
-        const STATE = {
-            mode: 'TREE', 
-            focusIndex: -1, 
-            focusTarget: null,
-            hand: { detected: false, x: 0, y: 0 },
-            rotation: { x: 0, y: 0 } 
-        };
+    <section id="projects" class="section-block reveal">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Selected Projects</span>
+          <h2>Prototype systems that connect robotics, sensing, and applied AI</h2>
+        </div>
+        <p>
+          The cards below are ready to expand into fuller case studies with videos, evaluation metrics, hardware
+          schematics, or GitHub links whenever you want to publish them.
+        </p>
+      </div>
 
-        let scene, camera, renderer, composer;
-        let mainGroup; 
-        let clock = new THREE.Clock();
-        let particleSystem = []; 
-        let photoMeshGroup = new THREE.Group();
-        let giftGroup;
-        let nailongSprite;
-        let handLandmarker, video, webcamCanvas, webcamCtx;
-        let caneTexture; 
+      <div class="project-grid">
+        <article class="project-card">
+          <div class="project-topline">
+            <span>Featured Prototype</span>
+            <span class="status-pill">In Progress</span>
+          </div>
+          <h3>VLA Robotic Arm for Coffee Preparation</h3>
+          <p class="project-summary">
+            A kitchen-oriented manipulation system that explores how a vision-language-action model can control a
+            robotic arm for drink preparation, tool handling, and repeatable multi-step routines.
+          </p>
+          <div class="metric-row">
+            <span class="metric-chip">Robotic Control</span>
+            <span class="metric-chip">Task Sequencing</span>
+            <span class="metric-chip">Perception-to-Action</span>
+          </div>
+          <p class="project-notes">
+            Suggested next additions: system diagram, workspace camera layout, gripper design, failure modes, and task
+            success benchmarks across different cup and tool configurations.
+          </p>
+        </article>
 
-        // Fireworks overlay
-        let fxCanvas, fxCtx, fireworks = [], fireworksRAF = null, fireworksEnd = null;
-        
-        // Interaction variables
-        const raycaster = new THREE.Raycaster();
-        const pointer = new THREE.Vector2();
+        <article class="project-card">
+          <div class="project-topline">
+            <span>System Platform</span>
+            <span class="status-pill">Roadmap</span>
+          </div>
+          <h3>AI Kitchen Hardware Connectivity Layer</h3>
+          <p class="project-summary">
+            An orchestration layer for smart kitchen equipment where devices can exchange state, accept high-level AI
+            instructions, and coordinate around real operating constraints such as timing, heat, and user safety.
+          </p>
+          <div class="metric-row">
+            <span class="metric-chip">Hardware API</span>
+            <span class="metric-chip">Sensor Fusion</span>
+            <span class="metric-chip">Agent Orchestration</span>
+          </div>
+          <p class="project-notes">
+            Suggested next additions: protocol choices, device inventory, local-vs-cloud control strategy, and diagrams
+            showing how AI decisions propagate to hardware execution.
+          </p>
+        </article>
 
-        async function init() {
-            initThree();
-            setupEnvironment(); 
-            setupLights();
-            createTextures();
-            createParticles(); 
-            createDust();     
-            createGifts();
-            addCartoonCharacters();
-            setupPostProcessing();
-            setupEvents();
-            // 不阻塞主场景：摄像头/模型加载失败也能正常进入页面
-            initMediaPipe().catch((e) => console.warn('MediaPipe init failed:', e));
-            
-            const loader = document.getElementById('loader');
-            loader.style.opacity = 0;
-            setTimeout(() => loader.remove(), 800);
+        <article class="project-card">
+          <div class="project-topline">
+            <span>Portfolio Slot</span>
+            <span class="status-pill">Ready for Upload</span>
+          </div>
+          <h3>Future Project: Intelligent Food Workflow Assistant</h3>
+          <p class="project-summary">
+            Reserve this block for a system that helps users plan preparation steps, monitor device state, and adapt the
+            kitchen workflow dynamically when ingredients, timing, or equipment conditions change.
+          </p>
+          <div class="metric-row">
+            <span class="metric-chip">Planning Agent</span>
+            <span class="metric-chip">Realtime Context</span>
+            <span class="metric-chip">Workflow Guidance</span>
+          </div>
+          <p class="project-notes">
+            This structure already supports adding a paper abstract, demo video link, external repository, or hardware
+            bill of materials.
+          </p>
+        </article>
 
-            animate();
+        <article class="project-card">
+          <div class="project-topline">
+            <span>Portfolio Slot</span>
+            <span class="status-pill">Ready for Upload</span>
+          </div>
+          <h3>Future Project: Kitchen Embodied Data Collection</h3>
+          <p class="project-summary">
+            Use this slot for datasets, benchmark environments, or evaluation pipelines that support more robust training
+            and validation of embodied agents in constrained food-service spaces.
+          </p>
+          <div class="metric-row">
+            <span class="metric-chip">Dataset Design</span>
+            <span class="metric-chip">Benchmarking</span>
+            <span class="metric-chip">Evaluation Tools</span>
+          </div>
+          <p class="project-notes">
+            A strong research site benefits from showing not only product demos but also the infrastructure that makes
+            those demos reproducible and scalable.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section id="framework" class="section-block reveal">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Working Framework</span>
+          <h2>A practical research stack for intelligent food and kitchen systems</h2>
+        </div>
+        <p>
+          The presentation here intentionally bridges academic language and product language, so the site can support
+          both technical collaborators and future business-facing discussions.
+        </p>
+      </div>
+
+      <div class="framework-grid">
+        <article class="framework-card">
+          <h3>System philosophy</h3>
+          <p>
+            Build embodied AI systems that can sense the environment, reason over user goals, act through hardware, and
+            report state in a form people can actually trust.
+          </p>
+          <div class="framework-points">
+            <div class="framework-point">
+              <strong>Perceive clearly</strong>
+              <span>Multimodal state estimation across cameras, sensors, and connected appliances.</span>
+            </div>
+            <div class="framework-point">
+              <strong>Plan robustly</strong>
+              <span>Task decomposition that can survive timing shifts, object variation, and partial failures.</span>
+            </div>
+            <div class="framework-point">
+              <strong>Execute safely</strong>
+              <span>Control policies grounded in hardware limits, user supervision, and operational constraints.</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="timeline-card">
+          <h3>Near-term roadmap</h3>
+          <div class="timeline-list">
+            <div class="timeline-item">
+              <strong>Stage 1</strong>
+              <span>Publish core personal profile, research scope, and first two flagship project pages.</span>
+            </div>
+            <div class="timeline-item">
+              <strong>Stage 2</strong>
+              <span>Add videos, architecture diagrams, photos of hardware iterations, and test results.</span>
+            </div>
+            <div class="timeline-item">
+              <strong>Stage 3</strong>
+              <span>Expand into a formal portfolio with publications, talks, collaborations, and open-source modules.</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="contact" class="section-block reveal">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Contact &amp; Presence</span>
+          <h2>Structured for future collaborators, labs, and product partners</h2>
+        </div>
+        <p>
+          Replace placeholder entries below with your real email, GitHub profile, publications, or company links when
+          you are ready. The layout is already set up for that upgrade.
+        </p>
+      </div>
+
+      <div class="contact-grid">
+        <article class="contact-card">
+          <div class="contact-label">Website</div>
+          <div class="contact-value">www.yasfood.cn</div>
+          <p>
+            Primary domain for your public-facing work in robotics, intelligent hardware, and applied AI.
+          </p>
+        </article>
+
+        <article class="contact-card">
+          <div class="contact-label">GitHub</div>
+          <div class="contact-value">Add your profile</div>
+          <p>
+            Good place for repositories, demos, code samples, and reproducible engineering artifacts.
+          </p>
+        </article>
+
+        <article class="contact-card">
+          <div class="contact-label">Email</div>
+          <div class="contact-value">Add your address</div>
+          <p>
+            You can swap this placeholder with an academic email, founder contact, or project inquiry address.
+          </p>
+        </article>
+      </div>
+
+      <footer class="footer">
+        <span>YasFood is presented as a research-oriented portfolio for embodied AI and kitchen automation.</span>
+        <span>Last updated: March 23, 2026</span>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
         }
-
-        function initThree() {
-            const container = document.getElementById('canvas-container');
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(CONFIG.colors.bg);
-            scene.fog = new THREE.FogExp2(CONFIG.colors.bg, 0.01); 
-
-            // 适应移动端纵横比
-            camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 2, CONFIG.camera.z); 
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            // 提高清晰度（仍保留上限，避免移动端过重）
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
-            renderer.toneMapping = THREE.ReinhardToneMapping; 
-            renderer.toneMappingExposure = 2.2; 
-            container.appendChild(renderer.domElement);
-
-            mainGroup = new THREE.Group();
-            mainGroup.position.y = -2; 
-            scene.add(mainGroup);
-        }
-
-        function setupEnvironment() {
-            const pmremGenerator = new THREE.PMREMGenerator(renderer);
-            scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-        }
-
-        function setupLights() {
-            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(ambient);
-
-            const innerLight = new THREE.PointLight(0xffaa00, 2, 20);
-            innerLight.position.set(0, 5, 0);
-            mainGroup.add(innerLight);
-
-            const spotGold = new THREE.SpotLight(0xffcc66, 1200);
-            spotGold.position.set(30, 40, 40);
-            spotGold.angle = 0.5;
-            spotGold.penumbra = 0.5;
-            scene.add(spotGold);
-
-            const spotBlue = new THREE.SpotLight(0x6688ff, 600);
-            spotBlue.position.set(-30, 20, -30);
-            scene.add(spotBlue);
-            
-            const fill = new THREE.DirectionalLight(0xffeebb, 0.8);
-            fill.position.set(0, 0, 50);
-            scene.add(fill);
-        }
-
-        function setupPostProcessing() {
-            const renderScene = new RenderPass(scene, camera);
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-            bloomPass.threshold = 0.7; 
-            bloomPass.strength = 0.45; 
-            bloomPass.radius = 0.4;
-
-            composer = new EffectComposer(renderer);
-            composer.addPass(renderScene);
-            composer.addPass(bloomPass);
-        }
-
-        function createTextures() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 128; canvas.height = 128;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0,0,128,128);
-            ctx.fillStyle = '#880000'; 
-            ctx.beginPath();
-            for(let i=-128; i<256; i+=32) {
-                ctx.moveTo(i, 0); ctx.lineTo(i+32, 128); ctx.lineTo(i+16, 128); ctx.lineTo(i-16, 0);
-            }
-            ctx.fill();
-            caneTexture = new THREE.CanvasTexture(canvas);
-            caneTexture.wrapS = THREE.RepeatWrapping;
-            caneTexture.wrapT = THREE.RepeatWrapping;
-            caneTexture.repeat.set(3, 3);
-        }
-
-        class Particle {
-            constructor(mesh, type, isDust = false) {
-                this.mesh = mesh;
-                this.type = type;
-                this.isDust = isDust;
-                
-                this.posTree = new THREE.Vector3();
-                this.posScatter = new THREE.Vector3();
-                this.baseScale = mesh.scale.x; 
-
-                const speedMult = (type === 'PHOTO') ? 0.3 : 2.0;
-
-                this.spinSpeed = new THREE.Vector3(
-                    (Math.random() - 0.5) * speedMult,
-                    (Math.random() - 0.5) * speedMult,
-                    (Math.random() - 0.5) * speedMult
-                );
-
-                this.calculatePositions();
-            }
-
-            calculatePositions() {
-                const h = CONFIG.particles.treeHeight;
-                const halfH = h / 2;
-                let t = Math.random(); 
-                t = Math.pow(t, 0.8); 
-                const y = (t * h) - halfH;
-                let rMax = CONFIG.particles.treeRadius * (1.0 - t); 
-                if (rMax < 0.5) rMax = 0.5;
-                const angle = t * 50 * Math.PI + Math.random() * Math.PI; 
-                // 让照片更靠外，减少被树体/装饰遮挡
-                const outward = (this.type === 'PHOTO') ? 1.25 : 1.0;
-                const r = rMax * (0.8 + Math.random() * 0.4) * outward; 
-                this.posTree.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
-
-                let rScatter = this.isDust ? (12 + Math.random()*20) : (8 + Math.random()*12);
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos(2 * Math.random() - 1);
-                this.posScatter.set(
-                    rScatter * Math.sin(phi) * Math.cos(theta),
-                    rScatter * Math.sin(phi) * Math.sin(theta),
-                    rScatter * Math.cos(phi)
-                );
-            }
-
-            update(dt, mode, focusTargetMesh) {
-                let target = this.posTree;
-                
-                if (mode === 'SCATTER') target = this.posScatter;
-                else if (mode === 'FOCUS') {
-                    if (this.mesh === focusTargetMesh) {
-                        const desiredWorldPos = new THREE.Vector3(0, 2, 35);
-                        const invMatrix = new THREE.Matrix4().copy(mainGroup.matrixWorld).invert();
-                        target = desiredWorldPos.applyMatrix4(invMatrix);
-                    } else {
-                        target = this.posScatter;
-                    }
-                }
-
-                const lerpSpeed = (mode === 'FOCUS' && this.mesh === focusTargetMesh) ? 5.0 : 2.0; 
-                this.mesh.position.lerp(target, lerpSpeed * dt);
-
-                if (mode === 'SCATTER') {
-                    this.mesh.rotation.x += this.spinSpeed.x * dt;
-                    this.mesh.rotation.y += this.spinSpeed.y * dt;
-                    this.mesh.rotation.z += this.spinSpeed.z * dt; 
-                } else if (mode === 'TREE') {
-                    this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt);
-                    this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0, dt);
-                    this.mesh.rotation.y += 0.5 * dt; 
-                }
-                
-                if (mode === 'FOCUS' && this.mesh === focusTargetMesh) {
-                    this.mesh.lookAt(camera.position); 
-                }
-
-                let s = this.baseScale;
-                if (this.isDust) {
-                    s = this.baseScale * (0.8 + 0.4 * Math.sin(clock.elapsedTime * 4 + this.mesh.id));
-                    if (mode === 'TREE') s = 0; 
-                } else if (mode === 'SCATTER' && this.type === 'PHOTO') {
-                    s = this.baseScale * 2.5; 
-                } else if (mode === 'FOCUS') {
-                    // 聚焦时更大更清晰
-                    if (this.mesh === focusTargetMesh) s = 6.5; 
-                    else s = this.baseScale * 0.8; 
-                }
-                
-                this.mesh.scale.lerp(new THREE.Vector3(s,s,s), 4*dt);
-            }
-        }
-
-        // --- CREATION ---
-        function createParticles() {
-            const sphereGeo = new THREE.SphereGeometry(0.5, 32, 32); 
-            const boxGeo = new THREE.BoxGeometry(0.55, 0.55, 0.55); 
-            const curve = new THREE.CatmullRomCurve3([
-                new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 0.3, 0),
-                new THREE.Vector3(0.1, 0.5, 0), new THREE.Vector3(0.3, 0.4, 0)
-            ]);
-            const candyGeo = new THREE.TubeGeometry(curve, 16, 0.08, 8, false);
-
-            const goldMat = new THREE.MeshStandardMaterial({
-                color: CONFIG.colors.champagneGold,
-                metalness: 1.0, roughness: 0.1,
-                envMapIntensity: 2.0, 
-                emissive: 0x443300,   
-                emissiveIntensity: 0.3
-            });
-
-            const greenMat = new THREE.MeshStandardMaterial({
-                color: CONFIG.colors.deepGreen,
-                metalness: 0.2, roughness: 0.8,
-                emissive: 0x002200,
-                emissiveIntensity: 0.2 
-            });
-
-            const redMat = new THREE.MeshPhysicalMaterial({
-                color: CONFIG.colors.accentRed,
-                metalness: 0.3, roughness: 0.2, clearcoat: 1.0,
-                emissive: 0x330000
-            });
-            
-            const candyMat = new THREE.MeshStandardMaterial({ map: caneTexture, roughness: 0.4 });
-
-            for (let i = 0; i < CONFIG.particles.count; i++) {
-                const rand = Math.random();
-                let mesh, type;
-                
-                if (rand < 0.25) {
-                    mesh = new THREE.Mesh(boxGeo, greenMat);
-                    type = 'BOX';
-                } else if (rand < 0.50) {
-                    mesh = new THREE.Mesh(boxGeo, goldMat);
-                    type = 'GOLD_BOX';
-                } else if (rand < 0.88) {
-                    mesh = new THREE.Mesh(sphereGeo, goldMat);
-                    type = 'GOLD_SPHERE';
-                } else if (rand < 0.96) {
-                    mesh = new THREE.Mesh(sphereGeo, redMat);
-                    type = 'RED';
-                } else {
-                    mesh = new THREE.Mesh(candyGeo, candyMat);
-                    type = 'CANE';
-                }
-
-                const s = 0.28 + Math.random() * 0.32;
-                mesh.scale.set(s,s,s);
-                mesh.rotation.set(Math.random()*6, Math.random()*6, Math.random()*6);
-                
-                mainGroup.add(mesh);
-                particleSystem.push(new Particle(mesh, type, false));
-            }
-
-            const starGeo = new THREE.OctahedronGeometry(0.9, 0);
-            const starMat = new THREE.MeshStandardMaterial({
-                color: 0xffdd88, emissive: 0xffaa00, emissiveIntensity: 1.0,
-                metalness: 1.0, roughness: 0
-            });
-            const star = new THREE.Mesh(starGeo, starMat);
-            star.position.set(0, CONFIG.particles.treeHeight/2 + 0.8, 0);
-            mainGroup.add(star);
-            
-            mainGroup.add(photoMeshGroup);
-        }
-
-        function createDust() {
-            const geo = new THREE.TetrahedronGeometry(0.08, 0);
-            const mat = new THREE.MeshBasicMaterial({ color: 0xffeebb, transparent: true, opacity: 0.8 });
-            
-            for(let i=0; i<CONFIG.particles.dustCount; i++) {
-                 const mesh = new THREE.Mesh(geo, mat);
-                 mesh.scale.setScalar(0.5 + Math.random());
-                 mainGroup.add(mesh);
-                 particleSystem.push(new Particle(mesh, 'DUST', true));
-            }
-        }
-
-        function createGifts() {
-            giftGroup = new THREE.Group();
-            const baseY = -CONFIG.particles.treeHeight / 2 - 1.6;
-            const palette = [CONFIG.colors.champagneGold, CONFIG.colors.accentRed, CONFIG.colors.deepGreen];
-
-            for (let i = 0; i < 55; i++) {
-                const size = 0.9 + Math.random() * 0.8;
-                const height = size * (0.65 + Math.random() * 0.35);
-                const boxGeo = new THREE.BoxGeometry(size, height, size);
-                const color = palette[Math.floor(Math.random() * palette.length)];
-                const boxMat = new THREE.MeshStandardMaterial({
-                    color,
-                    metalness: color === CONFIG.colors.champagneGold ? 0.95 : 0.45,
-                    roughness: color === CONFIG.colors.champagneGold ? 0.15 : 0.35,
-                    emissive: 0x111111,
-                    emissiveIntensity: 0.12
-                });
-                const gift = new THREE.Mesh(boxGeo, boxMat);
-
-                const angle = Math.random() * Math.PI * 2;
-                const radius = 1.0 + Math.random() * 3.8;
-                gift.position.set(Math.cos(angle) * radius, baseY + height / 2, Math.sin(angle) * radius);
-                gift.rotation.y = Math.random() * Math.PI;
-
-                const ribbonGeo = new THREE.BoxGeometry(size * 0.14, height * 1.08, size * 1.06);
-                const ribbonGeo2 = new THREE.BoxGeometry(size * 1.06, height * 1.08, size * 0.14);
-                const ribbonMat = new THREE.MeshStandardMaterial({ color: 0xf7d35a, metalness: 1, roughness: 0.08, emissive: 0x553300, emissiveIntensity: 0.5 });
-                const ribbon1 = new THREE.Mesh(ribbonGeo, ribbonMat);
-                const ribbon2 = new THREE.Mesh(ribbonGeo2, ribbonMat);
-                gift.add(ribbon1); gift.add(ribbon2);
-
-                giftGroup.add(gift);
-            }
-
-            mainGroup.add(giftGroup);
-        }
-
-        function addCartoonCharacters() {
-            // 轻量“自动抠图”：取四角平均作为背景色，接近背景色的像素设为透明
-            function autoCutoutTexture(img) {
-                const canvas = document.createElement('canvas');
-                const srcW = img.naturalWidth || img.width;
-                const srcH = img.naturalHeight || img.height;
-
-                // 下采样，避免大图逐像素处理导致页面卡死
-                const maxDim = 512;
-                const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
-                const w = Math.max(1, Math.round(srcW * scale));
-                const h = Math.max(1, Math.round(srcH * scale));
-                canvas.width = w;
-                canvas.height = h;
-
-                const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                ctx.drawImage(img, 0, 0, w, h);
-                const data = ctx.getImageData(0, 0, w, h);
-
-                // 如果图片本身已有透明通道（常见的抠好 PNG），就不再做背景抠图
-                let hasAlpha = false;
-                for (let y = 0; y < h; y += Math.max(1, Math.floor(h / 10))) {
-                    for (let x = 0; x < w; x += Math.max(1, Math.floor(w / 10))) {
-                        const i = (y * w + x) * 4;
-                        if (data.data[i + 3] < 250) { hasAlpha = true; break; }
-                    }
-                    if (hasAlpha) break;
-                }
-                if (hasAlpha) {
-                    const tex = new THREE.CanvasTexture(canvas);
-                    tex.colorSpace = THREE.SRGBColorSpace;
-                    return tex;
-                }
-
-                function getPixel(x, y) {
-                    const i = (y * w + x) * 4;
-                    return [data.data[i], data.data[i + 1], data.data[i + 2]];
-                }
-
-                const c1 = getPixel(2, 2);
-                const c2 = getPixel(w - 3, 2);
-                const c3 = getPixel(2, h - 3);
-                const c4 = getPixel(w - 3, h - 3);
-                const bg = [
-                    Math.round((c1[0] + c2[0] + c3[0] + c4[0]) / 4),
-                    Math.round((c1[1] + c2[1] + c3[1] + c4[1]) / 4),
-                    Math.round((c1[2] + c2[2] + c3[2] + c4[2]) / 4)
-                ];
-
-                const threshold = 42; // 越大抠得越“狠”
-                for (let i = 0; i < data.data.length; i += 4) {
-                    const r = data.data[i];
-                    const g = data.data[i + 1];
-                    const b = data.data[i + 2];
-                    const dr = r - bg[0];
-                    const dg = g - bg[1];
-                    const db = b - bg[2];
-                    const dist = Math.sqrt(dr * dr + dg * dg + db * db);
-                    if (dist < threshold) data.data[i + 3] = 0;
-                }
-                ctx.putImageData(data, 0, 0);
-                const tex = new THREE.CanvasTexture(canvas);
-                tex.colorSpace = THREE.SRGBColorSpace;
-                return tex;
-            }
-
-            function loadSprite(url, width, height, onReady) {
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    const tex = autoCutoutTexture(img);
-                    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
-                    const sprite = new THREE.Sprite(mat);
-                    sprite.scale.set(width, height, 1);
-                    sprite.renderOrder = 999;
-                    onReady(sprite);
-                };
-                img.onerror = () => console.warn('Character image not found:', url);
-                img.src = url;
-            }
-
-            // 放在圣诞树顶部
-            loadSprite(NAILONG_IMG, 3.2, 3.2, (sp) => {
-                nailongSprite = sp;
-                nailongSprite.position.set(0.0, CONFIG.particles.treeHeight / 2 + 0.6, 0.6);
-                mainGroup.add(nailongSprite);
-            });
-        }
-
-        function addPhotoToScene(texture) {
-            const frameGeo = new THREE.BoxGeometry(1.4, 1.4, 0.05);
-            const frameMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.champagneGold, metalness: 1.0, roughness: 0.1 });
-            const frame = new THREE.Mesh(frameGeo, frameMat);
-
-            const photoGeo = new THREE.PlaneGeometry(1.2, 1.2);
-            const photoMat = new THREE.MeshBasicMaterial({ map: texture });
-            const photo = new THREE.Mesh(photoGeo, photoMat);
-            photo.position.z = 0.04;
-
-            const group = new THREE.Group();
-            group.add(frame);
-            group.add(photo);
-            
-            const s = 1.15;
-            group.scale.set(s,s,s);
-            
-            photoMeshGroup.add(group);
-            particleSystem.push(new Particle(group, 'PHOTO', false));
-        }
-        
-        // --- INTERACTION ---
-        function handleImageUpload(e) {
-            const files = e.target.files;
-            if(!files.length) return;
-            Array.from(files).forEach(f => {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    new THREE.TextureLoader().load(ev.target.result, (t) => {
-                        t.colorSpace = THREE.SRGBColorSpace;
-                        // 提升清晰度（对倾斜纹理/远处纹理更有效）
-                        if (renderer) {
-                            const maxA = renderer.capabilities.getMaxAnisotropy?.() ?? 1;
-                            t.anisotropy = Math.max(1, maxA);
-                        }
-                        // 避免某些情况下采样模糊
-                        t.wrapS = THREE.ClampToEdgeWrapping;
-                        t.wrapT = THREE.ClampToEdgeWrapping;
-                        t.needsUpdate = true;
-                        addPhotoToScene(t);
-                    });
-                }
-                reader.readAsDataURL(f);
-            });
-        }
-
-        function onPointerDown(event) {
-            if (event.target.closest('#ui-layer')) return;
-
-            // 触摸/点击坐标标准化
-            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-            pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
-
-            raycaster.setFromCamera(pointer, camera);
-
-            const intersects = raycaster.intersectObjects(photoMeshGroup.children, true);
-
-            if (intersects.length > 0) {
-                let target = intersects[0].object;
-                while(target.parent !== photoMeshGroup && target.parent !== null) {
-                    target = target.parent;
-                }
-                
-                if (target.parent === photoMeshGroup) {
-                    STATE.focusTarget = target;
-                    STATE.mode = 'FOCUS';
-                    return;
-                }
-            }
-
-            if (STATE.mode === 'FOCUS') {
-                STATE.mode = 'TREE';
-                STATE.focusTarget = null;
-            }
-        }
-
-        // --- MEDIAPIPE (修改版) ---
-        async function initMediaPipe() {
-            video = document.getElementById('webcam');
-            webcamCanvas = document.getElementById('webcam-preview');
-            webcamCtx = webcamCanvas.getContext('2d');
-            // 降低分辨率以提高移动端性能
-            webcamCanvas.width = 160; webcamCanvas.height = 120;
-
-            const vision = await FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
-            );
-            handLandmarker = await HandLandmarker.createFromOptions(vision, {
-                baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                    delegate: "GPU"
-                },
-                runningMode: "VIDEO",
-                numHands: 1
-            });
-            
-            if (navigator.mediaDevices?.getUserMedia) {
-                try {
-                    // 修改: 针对手机端优先请求前置摄像头
-                    const constraints = {
-                        video: {
-                            facingMode: 'user', // 'user' 前置, 'environment' 后置
-                            width: { ideal: 480 },
-                            height: { ideal: 640 }
-                        }
-                    };
-                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                    video.srcObject = stream;
-                    
-                    // 修改: 显式调用播放，解决移动端自动播放限制
-                    video.play().catch(e => console.warn("Auto-play failed, waiting for user interaction", e));
-                    
-                    video.addEventListener("loadeddata", predictWebcam);
-                } catch(e) {
-                    console.warn("Webcam not available:", e);
-                    // 提示用户
-                    if(location.protocol !== 'https:' && location.hostname !== 'localhost') {
-                        alert("Camera requires HTTPS!");
-                    }
-                }
-            }
-        }
-
-        let lastVideoTime = -1;
-        async function predictWebcam() {
-            if (video.currentTime !== lastVideoTime) {
-                lastVideoTime = video.currentTime;
-                if (handLandmarker) {
-                    const result = handLandmarker.detectForVideo(video, performance.now());
-                    processGestures(result);
-                }
-            }
-            requestAnimationFrame(predictWebcam);
-        }
-
-        function processGestures(result) {
-            const cursor = document.getElementById('hand-cursor');
-
-            if (result.landmarks && result.landmarks.length > 0) {
-                STATE.hand.detected = true;
-                const lm = result.landmarks[0];
-                STATE.hand.x = (lm[9].x - 0.5) * 2; 
-                STATE.hand.y = (lm[9].y - 0.5) * 2;
-
-                const thumb = lm[4]; const index = lm[8]; const wrist = lm[0];
-                const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
-                const tips = [lm[8], lm[12], lm[16], lm[20]];
-                let avgDist = 0;
-                tips.forEach(t => avgDist += Math.hypot(t.x - wrist.x, t.y - wrist.y));
-                avgDist /= 4;
-
-                const screenX = (1 - index.x) * window.innerWidth;
-                const screenY = index.y * window.innerHeight;
-                
-                if(cursor) {
-                    cursor.style.display = 'block';
-                    cursor.style.left = screenX + 'px';
-                    cursor.style.top = screenY + 'px';
-                }
-
-                const ndcX = (screenX / window.innerWidth) * 2 - 1;
-                const ndcY = -(screenY / window.innerHeight) * 2 + 1;
-
-                raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-                const intersects = raycaster.intersectObjects(photoMeshGroup.children, true);
-                
-                let hoveredPhoto = null;
-                if (intersects.length > 0) {
-                    let target = intersects[0].object;
-                    while(target.parent !== photoMeshGroup && target.parent !== null) {
-                        target = target.parent;
-                    }
-                    if (target.parent === photoMeshGroup) {
-                        hoveredPhoto = target;
-                    }
-                }
-
-                if(cursor) {
-                    if (hoveredPhoto) {
-                        cursor.style.borderColor = '#ff3333';
-                        cursor.style.transform = 'translate(-50%, -50%) scale(1.6)';
-                    } else {
-                        cursor.style.borderColor = '#d4af37';
-                        cursor.style.transform = 'translate(-50%, -50%) scale(1)';
-                    }
-                }
-
-                if (pinchDist < 0.05) {
-                    if (STATE.mode !== 'FOCUS' && hoveredPhoto) {
-                        STATE.focusTarget = hoveredPhoto;
-                        STATE.mode = 'FOCUS';
-                    }
-                } else if (avgDist < 0.25) {
-                    STATE.mode = 'TREE';
-                    STATE.focusTarget = null;
-                } else if (avgDist > 0.4) {
-                    if (STATE.mode === 'FOCUS') {
-                         STATE.mode = 'SCATTER';
-                         STATE.focusTarget = null;
-                    } else if (STATE.mode === 'TREE') {
-                         STATE.mode = 'SCATTER';
-                    }
-                }
-            } else {
-                STATE.hand.detected = false;
-                if(cursor) cursor.style.display = 'none';
-            }
-        }
-
-        function setupEvents() {
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                composer.setSize(window.innerWidth, window.innerHeight);
-            });
-            
-            document.getElementById('file-input').addEventListener('change', handleImageUpload);
-            
-            window.addEventListener('pointerdown', onPointerDown);
-
-            window.addEventListener('keydown', (e) => {
-                if (e.key.toLowerCase() === 'h') {
-                    const controls = document.querySelector('.upload-wrapper');
-                    if (controls) controls.classList.toggle('ui-hidden');
-                }
-            });
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const dt = clock.getDelta();
-
-            if (STATE.mode === 'SCATTER' && STATE.hand.detected) {
-                const targetRotY = STATE.hand.x * Math.PI * 0.9; 
-                const targetRotX = STATE.hand.y * Math.PI * 0.25;
-                STATE.rotation.y += (targetRotY - STATE.rotation.y) * 3.0 * dt;
-                STATE.rotation.x += (targetRotX - STATE.rotation.x) * 3.0 * dt;
-            } else {
-                if(STATE.mode === 'TREE') {
-                    STATE.rotation.y += 0.3 * dt;
-                    STATE.rotation.x += (0 - STATE.rotation.x) * 2.0 * dt;
-                } else {
-                     STATE.rotation.y += 0.1 * dt; 
-                }
-            }
-
-            mainGroup.rotation.y = STATE.rotation.y;
-            mainGroup.rotation.x = STATE.rotation.x;
-
-            const showBaseDecor = (STATE.mode !== 'SCATTER');
-            if (giftGroup) giftGroup.visible = showBaseDecor;
-            if (nailongSprite) nailongSprite.visible = showBaseDecor;
-
-            particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget));
-            composer.render();
-        }
-
-        // Music control
-        const bgm = document.getElementById('bgm');
-        const audioToggle = document.getElementById('audio-toggle');
-        async function setPlaying(play) {
-            if (!bgm) return;
-            if (play) {
-                try {
-                    await bgm.play();
-                    if (audioToggle) audioToggle.textContent = '暂停音乐';
-                } catch (err) {
-                    console.error('Audio play failed', err);
-                    if (audioToggle) audioToggle.textContent = '播放音乐';
-                }
-            } else {
-                bgm.pause();
-                if (audioToggle) audioToggle.textContent = '播放音乐';
-            }
-        }
-
-        if (bgm && audioToggle) {
-            bgm.volume = 0.7;
-            // 默认尝试播放
-            setPlaying(true);
-            audioToggle.addEventListener('click', () => {
-                setPlaying(bgm.paused);
-            });
-
-            // 兼容浏览器自动播放限制：用户“点进页面”的第一次交互再强制播放
-            const tryAutoplayOnFirstTap = () => {
-                if (bgm.paused) setPlaying(true);
-            };
-            window.addEventListener('pointerdown', tryAutoplayOnFirstTap, { once: true, capture: true });
-        }
-
-        init();
-    </script>
-
-    <canvas id="fx-canvas"></canvas>
-
-    <script>
-        // 礼花效果：开场自动播放，颗粒更大更满屏
-        const fxCanvasEl = document.getElementById('fx-canvas');
-        let fxWidth = window.innerWidth, fxHeight = window.innerHeight;
-        fxCanvasEl.width = fxWidth; fxCanvasEl.height = fxHeight;
-        const fx2d = fxCanvasEl.getContext('2d');
-        let fxBursts = []; let fxRAF; let fxEndAt = performance.now() + 5200;
-
-        function spawnBurst() {
-            const colors = ['#ffd35a', '#ff9b4a', '#ff6fb7', '#7cf2ff', '#7ef7c1', '#fff6d9'];
-            const x = Math.random() * fxWidth * 0.9 + fxWidth * 0.05;
-            const y = Math.random() * fxHeight * 0.45 + fxHeight * 0.03;
-            const count = 60 + Math.floor(Math.random() * 40);
-            for (let i = 0; i < count; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 5 + Math.random() * 6.5;
-                fxBursts.push({
-                    x, y,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed,
-                    life: 80 + Math.random() * 60,
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    size: 3 + Math.random() * 3
-                });
-            }
-        }
-
-        let lastSpawn = 0;
-        function fxStep(ts) {
-            if (ts - lastSpawn > 220 && ts < fxEndAt) {
-                spawnBurst();
-                lastSpawn = ts;
-            }
-
-            fx2d.clearRect(0, 0, fxWidth, fxHeight);
-            fx2d.globalCompositeOperation = 'lighter';
-            for (let i = fxBursts.length - 1; i >= 0; i--) {
-                const p = fxBursts[i];
-                p.x += p.vx; p.y += p.vy;
-                p.vy += 0.05; // gravity
-                p.vx *= 0.99; p.vy *= 0.99;
-                p.life -= 1;
-                if (p.life <= 0) { fxBursts.splice(i,1); continue; }
-                const alpha = Math.max(0, Math.min(1, p.life / 60));
-                fx2d.fillStyle = p.color;
-                fx2d.globalAlpha = alpha;
-                fx2d.beginPath();
-                fx2d.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                fx2d.fill();
-            }
-
-            if (ts > fxEndAt && fxBursts.length === 0) {
-                cancelAnimationFrame(fxRAF);
-                fxCanvasEl.style.opacity = '0';
-                setTimeout(() => fxCanvasEl.remove(), 600);
-                return;
-            }
-            fxRAF = requestAnimationFrame(fxStep);
-        }
-
-        function startFireworks() {
-            fxStep(performance.now());
-        }
-
-        window.addEventListener('resize', () => {
-            fxWidth = window.innerWidth; fxHeight = window.innerHeight;
-            fxCanvasEl.width = fxWidth; fxCanvasEl.height = fxHeight;
-        });
-
-        startFireworks();
-    </script>
+      });
+    }, { threshold: 0.15 });
+
+    document.querySelectorAll(".reveal").forEach((section) => observer.observe(section));
+  </script>
 </body>
 </html>
