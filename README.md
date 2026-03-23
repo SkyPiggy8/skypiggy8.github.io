@@ -1,3 +1,3 @@
-# YasFood Website
+# Robotics AI Portfolio
 
-Personal website for `www.yasfood.cn`, built as a research-style portfolio focused on embodied AI, kitchen robotics, and intelligent hardware systems.
+Personal GitHub Pages website for showcasing robotics, embodied AI, intelligent hardware, and project case studies.
